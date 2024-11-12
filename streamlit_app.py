@@ -1,15 +1,17 @@
 import streamlit as st
+import pandas as pd
+import joblib
 from upload import load_model_and_data
 from predictions import prepare_data, predict_dropout
 from visualizations import show_overall_results, show_risk_group, show_major_distribution, show_income_distribution, show_gpa_distribution
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from io import BytesIO
 
-# 페이지 설정
-#st.set_page_config(page_title='중도탈락 예측 모듈', page_icon=':school:')
 # 페이지 설정
 st.set_page_config(
     page_title='중도탈락 예측 모듈',
     page_icon=':school:',
-    layout='wide'  # Wide mode 설정
+    layout='wide'
 )
 
 # CSS 스타일 설정
@@ -31,15 +33,20 @@ st.markdown("""
     <h1 style="color: #FFA500;">K-LXP 학생 중도탈락 예측 모듈</h1>
     """, unsafe_allow_html=True)
 
-#st.title("K-LXP 학생 중도탈락 예측 모듈")
-st.write("업데이트된 데이터를 바탕으로 학생들의 중도탈락 예측 결과를 화면에 표시합니다.")
-
 # 페이지 구분
 page_selection = st.sidebar.radio("페이지 선택", ["파일 업로드", "결과 보기"])
 
 # 파일 업로드 페이지
 if page_selection == "파일 업로드":
-    load_model_and_data()
+    st.subheader("파일 업로드")
+    uploaded_model = st.file_uploader("예측 모델 (.joblib 파일) 업로드", type="joblib")
+    uploaded_data = st.file_uploader("테스트 데이터 (.csv 파일) 업로드", type="csv")
+
+    if uploaded_model and uploaded_data:
+        # 모델과 데이터를 세션 상태에 저장
+        st.session_state.model = joblib.load(BytesIO(uploaded_model.read()))
+        st.session_state.uploaded_data = pd.read_csv(uploaded_data)
+        st.success("모델과 데이터가 성공적으로 업로드되었습니다.")
 
 # 결과 보기 페이지
 if page_selection == "결과 보기":

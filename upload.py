@@ -20,3 +20,4 @@ def load_model_and_data():
     if uploaded_data:
         st.session_state.uploaded_data = pd.read_csv(uploaded_data)
         st.success("데이터 파일이 성공적으로 업로드되었습니다.")
+        
