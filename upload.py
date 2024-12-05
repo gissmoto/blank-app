@@ -5,8 +5,7 @@ from io import BytesIO
 
 def load_model_and_data():
     st.subheader("파일 업로드")
-
-    # 모델 파일 업로드 및 로드
+        # 모델 파일 업로드 및 로드
     if 'model' not in st.session_state:
         uploaded_model = st.file_uploader("학습된 예측 모델 (.joblib) 파일을 업로드하세요.", type="joblib")
         if uploaded_model:

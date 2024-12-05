@@ -1,31 +1,108 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from sklearn.ensemble import RandomForestRegressor
+import matplotlib.font_manager as fm
 
 def show_overall_results(data):
-    st.subheader("학생 목록 (중도탈락 예측 여부 및 산출 스코어)")
-    #st.markdown("<hr>", unsafe_allow_html=True)
-    for index, row in data.iterrows():
-        if 0.4 <= row['중도탈락_스코어'] <= 0.7:
-            icon_color = "orange"
-        elif row['중도탈락_예측'] == 1:
-            icon_color = "red"
-        else:
-            icon_color = "green"
-        
-        dropout_score = f"{row['중도탈락_스코어']:.2f}"
-        st.markdown(
-            f"""
-            <div style="display: flex; align-items: center; gap: 20px;">
-                <div class="icon {icon_color}"></div>
-                <span style="margin-right: 30px;">학번: {row["학번"]}</span>
-                <span style="margin-right: 30px;">이름: {row["이름"]}</span>
-                <span>중도탈락 예상 스코어: {dropout_score}</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    st.subheader("수강 학생 목록 (중도탈락 예측 여부 및 산출 스코어)")
+    total_students = len(data)
+    high_risk_students = len(data[data['중도탈락_스코어'] >= 0.7])
+    high_risk_percentage = (high_risk_students / total_students) * 100
+    low_risk_students = total_students - high_risk_students
 
+# CSS 스타일 정의
+    st.markdown(
+    """
+    <style>
+    .custom-container {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+        margin-bottom: 20px;
+    }
+    .stColumn > div {
+        padding: 10px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+    )
+
+# 레이아웃 설정
+    col1, col2 = st.columns([2, 1])
+     
+    with col1:
+        # 스타일을 적용한 div 추가
+        
+        for index, row in data.iterrows():
+            if 0.4 <= row['중도탈락_스코어'] <= 0.7:
+                icon_color = "orange"
+            elif row['중도탈락_예측'] == 1:
+                icon_color = "red"
+            else:
+                icon_color = "green"
+
+            dropout_score = f"{row['중도탈락_스코어']:.2f}"
+            st.markdown(
+                f"""
+                <div style="display: flex; align-items: center; gap: 20px;">
+                    <div class="icon" style="width: 15px; height: 15px; background-color: {icon_color}; border-radius: 50%;"></div>
+                    <span style="margin-right: 30px;">학번: {row["학번"]}</span>
+                    <span style="margin-right: 30px;">이름: {row["이름"]}</span>
+                    <span>중도탈락 예상 스코어: {dropout_score}</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        
+
+        
+    with col2:
+        # 스타일을 적용한 div 추가
+        st.markdown(f"""
+            <p style="font-size:16px;">고위험군 학생 비율: <strong>{high_risk_percentage:.2f}% ({total_students} 중 {high_risk_students} 명)</strong></p>
+        """, unsafe_allow_html=True)
+
+        # Plotly 도넛 차트 생성
+        labels = ['High Risk', 'Low Risk']
+        sizes = [high_risk_students, low_risk_students]
+        colors = ['red', '#A9A9A9']
+
+        fig = go.Figure(go.Pie(
+            labels=labels,
+            values=sizes,
+            hole=0.6,  # 도넛 차트의 구멍 크기
+            textinfo='percent+label',
+            marker=dict(colors=colors, line=dict(color='#000000', width=2)),
+        ))
+        st.plotly_chart(fig)
+        """
+        features = [col for col in data.columns if col not in ['중도탈락_스코어', '중도탈락_예측', '학번', '이름','리스크_그룹']]
+        #st.write("중도탈락 스코어에 활용된 특성:", features)
+        #st.write("중도탈락 스코어에 활용된 특성:", features)
+        X = data[features]
+        y = data['중도탈락_스코어']
+
+        # 랜덤 포레스트 모델 학습
+        model = RandomForestRegressor(random_state=42)
+        model.fit(X, y)
+
+        # 특성 중요도 계산
+        importance = model.feature_importances_
+        importance_df = pd.DataFrame({
+            '특성': features,
+            '중요도': importance
+        }).sort_values(by='중요도', ascending=False)
+
+        # 중요도 출력
+        st.subheader("특성 중요도")
+        st.write(importance_df)
+               
+        """
 def show_risk_group(data, features):
     # 리스크 그룹별 학생 수 분포
     st.subheader("리스크 그룹별 학생 분포")
@@ -80,8 +157,67 @@ def show_risk_group(data, features):
         
         st.write(styled_table.to_html(), unsafe_allow_html=True)
 
+    """#히트맵 그리기
+    st.subheader("리스크 그룹별 평균 특성 (히트맵)")
 
+    # 리스크 그룹별 평균 값 계산
+    # 리스크 그룹별 합계 대비 비율 계산
+    mean_features_by_risk = data.groupby('리스크_그룹')[features].sum()
+    proportion_features_by_risk = mean_features_by_risk.div(mean_features_by_risk.sum(axis=1), axis=0) * 100
 
+    # 히트맵 생성 (특성을 가로축에, 리스크 그룹을 세로축에 표시)
+    fig_heatmap = px.imshow(
+        proportion_features_by_risk,
+        labels={"x": "특성", "y": "리스크 그룹", "color": "비율 (%)"},
+        x=proportion_features_by_risk.columns,
+        y=proportion_features_by_risk.index,
+        color_continuous_scale="RdYlBu",  # 색상 스케일: 빨강-노랑-파랑
+        range_color=[0, 100]  # 비율은 0%에서 100% 사이로 제한
+    )
+
+    # 레이아웃 설정
+    fig_heatmap.update_layout(
+        autosize=True,            # 그래프 크기 자동 조정
+        height=600,               # 높이 설정
+        title="리스크 그룹별 특성 비율 (히트맵)",
+        title_x=0.5,
+        xaxis_title="특성",
+        yaxis_title="리스크 그룹",
+        xaxis=dict(tickangle=-45, tickfont=dict(size=12)),  # x축 라벨 기울기 설정
+        yaxis=dict(tickfont=dict(size=12)),
+        coloraxis_colorbar=dict(title="비율 (%)", tickfont=dict(size=12), titlefont=dict(size=14))
+    )
+
+    # 그래프 출력
+    st.subheader("리스크 그룹별 특성 비율 (히트맵)")
+    st.plotly_chart(fig_heatmap)
+
+    # 히트맵 생성 (특성을 가로축에, 리스크 그룹을 세로축에 표시)
+    fig_heatmap = px.imshow(
+        mean_features_by_risk,
+        labels={"x": "특성", "y": "리스크 그룹", "color": "평균 값"},
+        x=mean_features_by_risk.columns,
+        y=mean_features_by_risk.index,
+        color_continuous_scale="RdYlBu",  # 색상 스케일: 빨강-노랑-파랑
+        range_color=[mean_features_by_risk.values.min(), mean_features_by_risk.values.max()]  # 색상 범위 최적화
+    )
+
+    # 레이아웃 설정
+    fig_heatmap.update_layout(
+        autosize=True,            # 그래프 크기 자동 조정
+        height=600,               # 높이 설정
+        title="리스크 그룹별 평균 특성 (히트맵)",
+        title_x=0.5,
+        xaxis_title="특성",
+        yaxis_title="리스크 그룹",
+        xaxis=dict(tickangle=-45, tickfont=dict(size=12)),  # x축 라벨 기울기 설정
+        yaxis=dict(tickfont=dict(size=12)),
+        coloraxis_colorbar=dict(title="평균 값", tickfont=dict(size=12), titlefont=dict(size=14))
+    )
+
+    # 그래프 출력
+    st.plotly_chart(fig_heatmap)
+"""
 
             # 리스크 그룹별 평균 특성
     st.subheader("리스크 그룹별 평균 특성")
@@ -128,37 +264,7 @@ def show_risk_group(data, features):
     
 
 
-#히트맵 그리기
-    st.subheader("리스크 그룹별 평균 특성 (히트맵)")
 
-    # 리스크 그룹별 평균 값 계산
-    mean_features_by_risk = data.groupby('리스크_그룹')[features].mean()
-
-    # 히트맵 생성 (특성을 가로축에, 리스크 그룹을 세로축에 표시)
-    fig_heatmap = px.imshow(
-        mean_features_by_risk,
-        labels={"x": "특성", "y": "리스크 그룹", "color": "평균 값"},
-        x=mean_features_by_risk.columns,
-        y=mean_features_by_risk.index,
-        color_continuous_scale="RdYlBu",  # 색상 스케일: 빨강-노랑-파랑
-        range_color=[mean_features_by_risk.values.min(), mean_features_by_risk.values.max()]  # 색상 범위 최적화
-    )
-
-    # 레이아웃 설정
-    fig_heatmap.update_layout(
-        autosize=True,            # 그래프 크기 자동 조정
-        height=600,               # 높이 설정
-        title="리스크 그룹별 평균 특성 (히트맵)",
-        title_x=0.5,
-        xaxis_title="특성",
-        yaxis_title="리스크 그룹",
-        xaxis=dict(tickangle=-45, tickfont=dict(size=12)),  # x축 라벨 기울기 설정
-        yaxis=dict(tickfont=dict(size=12)),
-        coloraxis_colorbar=dict(title="평균 값", tickfont=dict(size=12), titlefont=dict(size=14))
-    )
-
-    # 그래프 출력
-    st.plotly_chart(fig_heatmap)
 
 # 예시 데이터로 호출
 # show_risk_group_heatmap(data, features)
